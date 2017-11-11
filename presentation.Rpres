@@ -1,0 +1,230 @@
+Genetic Lifespan Explorer
+========================================================
+author: Daniel Acker
+date: 11/11/2017
+autosize: true
+
+Genetic lifespan dataset
+========================================================
+
+- Skene, Roy, and Grant (2017) quantified gene expression in mouse hippocampi sampled across the lifespan
+- The dataset covers both male and femle mice from two common laboratory strains
+  - C57Bl/6
+  - 129s5
+- The dataset revealed previously undiscovered age-dependent changes in Schizophrenia genes
+
+
+Genetic lifespan explorer app
+========================================================
+
+- The app allows users to search for their favorite genes in the dataset
+- Several genes can be queried simultaneously
+- New and interesting patterns can be found
+  - The gene SEMA4D encodes a transmembrane signalling protein (Sema4D) important for synapse development in early life. 
+  - Exploring this dataset, I found that SEMA4D expression is tightly correlated with genes that encode Sema4D receptors (PLXNB1 & CD72)
+  - However, SEMA4D expression is anticorrelated with the related gene SEMA4A
+
+Three output modes
+========================================================
+
+- 1) Scatterplots to view changes in genes by age
+
+```{r, echo=FALSE}
+library(dplyr)
+library(tidyr)
+library(reshape2)
+library(ggplot2)
+library(cowplot)
+library(ggdendro)
+library(gridExtra)
+library(ggsci)
+library(stringr)
+library(randomForest)
+library(caret)
+df = readRDS("data.rds")
+
+genes = c("SEMA4D", "CD72", "PLXNB1", "SEMA4A")
+
+select_genes = function(df, gene_list) {
+  valid_gene_list = T
+  sapply(gene_list, function(gene) {
+    if (gene %in% df$TargetID == F) {
+      valid_gene_list <<- F
+      print(paste("Gene name", gene, "not found.", sep=" "))
+    }
+  })
+  if (valid_gene_list == F) return(NULL)
+  return( subset(df, TargetID %in% gene_list) )
+}
+
+f1 = select_genes(df, genes) %>%
+  group_by(TargetID) %>%
+  mutate(normalized = scale(value/total_RNA) ) %>%
+  ungroup() %>%
+  ggplot(aes(Age, normalized, color=TargetID, fill=TargetID)) +
+  geom_point() +
+  geom_smooth(method="loess", span=.5, alpha=.2) +
+  labs(x="Age [days]", y="Signal / total signal\n[z-score]") +
+  theme(legend.title = element_blank()) +
+  scale_color_npg() +
+  scale_fill_npg()
+
+f2 = select_genes(df, genes) %>%
+  group_by(TargetID) %>%
+  mutate(normalized = scale(value/total_RNA) ) %>%
+  ungroup() %>%
+  ggplot(aes(Age, normalized, color=TargetID, fill=TargetID)) +
+  facet_grid(Strain~Sex, labeller=label_both) +
+  geom_point() +
+  geom_smooth(method="loess", span=.5, alpha=.2) +
+  labs(x="Age [days]", y="Signal / total signal\n[z-score]") +
+  theme(legend.title = element_blank()) +
+  scale_color_npg() +
+  scale_fill_npg()
+
+grid.arrange(f1, f2)
+```
+
+Three output modes
+========================================================
+
+- 2) Correlation matrices and dendrograms to track similarity in expression patterns
+
+```{r, echo=F}
+library(dplyr)
+library(tidyr)
+library(reshape2)
+library(ggplot2)
+library(cowplot)
+library(ggdendro)
+library(gridExtra)
+library(ggsci)
+library(stringr)
+library(randomForest)
+library(caret)
+df = readRDS("data.rds")
+
+genes = c("SEMA4D", "CD72", "PLXNB1", "SEMA4A")
+
+select_genes = function(df, gene_list) {
+  valid_gene_list = T
+  sapply(gene_list, function(gene) {
+    if (gene %in% df$TargetID == F) {
+      valid_gene_list <<- F
+      print(paste("Gene name", gene, "not found.", sep=" "))
+    }
+  })
+  if (valid_gene_list == F) return(NULL)
+  return( subset(df, TargetID %in% gene_list) )
+}
+
+p = select_genes(df, genes) %>%
+  group_by(TargetID) %>%
+  mutate(normalized = scale(value/total_RNA) ) %>%
+  ungroup() %>%
+  select(variable, TargetID, normalized) %>%
+  spread(TargetID, normalized) %>%
+  {.[,sapply(names(.), function(name) name %in% genes)]} %>%
+  cor() %>%
+  melt() %>%
+  ggplot(aes(Var1, Var2, fill=value)) +
+  geom_tile() +
+  labs(fill="Correlation") +
+  theme(
+    axis.title = element_blank(),
+    axis.text.x = element_text(angle=90, vjust=.5),
+    legend.position = "top"
+    ) +
+  scale_fill_gradient2(low="blue", mid="white", high="red", midpoint=0, 
+                       limits=c(-1,1), breaks=c(-1,0,1)) +
+  coord_equal()
+
+clust = select_genes(df, genes) %>%
+  group_by(TargetID) %>%
+  mutate(normalized = scale(value/total_RNA) ) %>%
+  ungroup() %>%
+  select(variable, TargetID, normalized) %>%
+  spread(TargetID, normalized) %>%
+  {.[,sapply(names(.), function(name) name %in% genes)]} %>%
+  cor() %>%
+  dist() %>%
+  hclust()
+
+dendro = ggdendrogram(clust, size = 2, rotate = T) + ggtitle("Similarity")
+
+g = grid.arrange(dendro, p, layout_matrix=rbind(c(1, 2)))
+print(g)
+```
+
+
+Three output modes
+========================================================
+
+- 3) Predictivity plots to show how well a gene or set of genes can be used to predict a mouse's age
+  - Normalized expression data is fit using a random forest model
+  - Displayed results represent out of sample predictions on a test dataset withheld during model training
+
+```{r, echo=F, fig.height=4, fig.width=10}
+library(dplyr)
+library(tidyr)
+library(reshape2)
+library(ggplot2)
+library(cowplot)
+library(ggdendro)
+library(gridExtra)
+library(ggsci)
+library(stringr)
+library(randomForest)
+library(caret)
+df = readRDS("data.rds")
+
+genes = c("SEMA4D", "CD72", "PLXNB1", "SEMA4A")
+
+select_genes = function(df, gene_list) {
+  valid_gene_list = T
+  sapply(gene_list, function(gene) {
+    if (gene %in% df$TargetID == F) {
+      valid_gene_list <<- F
+      print(paste("Gene name", gene, "not found.", sep=" "))
+    }
+  })
+  if (valid_gene_list == F) return(NULL)
+  return( subset(df, TargetID %in% gene_list) )
+}
+
+X_data = select_genes(df, genes) %>%
+  group_by(TargetID) %>%
+  mutate(normalized = scale(value/total_RNA) ) %>%
+  ungroup() %>%
+  select(variable, TargetID, normalized, Age) %>%
+  dcast(variable+Age~TargetID, value.var="normalized")
+
+train_idx = createDataPartition(X_data$Age, p=.6, list=F)
+train_data = X_data[train_idx,]
+test_data = X_data[-train_idx,]
+
+rf = randomForest(x=select(train_data, -Age, -variable), y=train_data$Age, importance=T)
+test_y = predict(rf, newdata = select(test_data, -Age, -variable))
+
+p1 = qplot(test_data$Age, test_y) +
+  #geom_smooth(method="loess", span=.5) +
+  xlab("True age [days]") +
+  ylab("Fitted age [days]") +
+  geom_smooth()
+
+p2 = rf$importance[,1] %>%
+  melt() %>%
+  mutate(Gene=rownames(.)) %>%
+  mutate(value=scales::rescale(value, to=c(.1,1))) %>%
+  mutate(Total=sum(value)) %>%
+  mutate(`Relative importance`=value/Total) %>%
+  ggplot(aes(reorder(Gene, -`Relative importance`), `Relative importance`)) +
+  geom_bar(stat="identity") +
+  theme(
+    axis.text.x = element_text(angle=90, vjust=.5),
+    axis.title.x = element_blank()
+    )
+
+grid.arrange(p1, p2, nrow=1)
+```
+

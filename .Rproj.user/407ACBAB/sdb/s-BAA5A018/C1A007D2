@@ -1,0 +1,20 @@
+{
+    "collab_server" : "",
+    "contents" : "library(shiny)\n\n# Define UI for application that draws a histogram\nshinyUI(fluidPage(\n  \n  # Application title\n  titlePanel(\"Genetic Lifespan Explorer\"),\n  \n  # Sidebar with a slider input for number of bins \n  sidebarLayout(\n    sidebarPanel(\n      \n      a(\"Skene, Roy, and Grant (2017)\", \n        href=\"https://www.ncbi.nlm.nih.gov/pmc/articles/PMC5595438/\"),\n      \n      \"quantified gene expression in mouse\n      hippocampi sampled across the lifespan. This app allows researchers to\n      explore the dataset and query the age dependent variation in the expression \n      of their favorite genes.\",\n      \n      tag(\"br\", \"\"),\n      \n      textInput(\"caption\", \"Enter Gene Names\", \"SEMA4D, PLXNB1, CD72, GAPDH\"),\n      \n      \"Enter up to ten gene names sperated by commas. \n      Names must be valid mouse gene abbreviations.\",\n      \n      tag(\"br\", \"\"),\n      \n      submitButton(text = \"Go\", icon = NULL, width = NULL),\n      \n      radioButtons(\"chart_type\", NULL, choices = c(\n        \"Lifespan charts\", \"Correlation matrix\", \"Predictivity charts\"\n      ), selected = \"Lifespan charts\")\n      \n    ),\n    \n    # Show a plot of the generated distribution\n    mainPanel(\n      plotOutput(\"Plot\", height=\"500px\"),\n      \n      tag(\"br\", \"\"),\n      \n      \"`Lifespan charts` will show gene expression trends across all sampled ages.\n      `Correlation matrix` will show the linear dependencies and heirarchical clustering\n      of genes across the lifespan. `Predictivity charts` will show the result of fitting\n      a random forest regressor to total-RNA-normalized and z-scored expression data for the \n      given genes with animal age as the outcome variable. The dataset is randomly partitioned \n      into training and testing sets, and the displayed fitted values correspond to the testing set.\"\n    )\n  )\n))\n\n\n",
+    "created" : 1510337682379.000,
+    "dirty" : false,
+    "encoding" : "UTF-8",
+    "folds" : "",
+    "hash" : "2012458715",
+    "id" : "C1A007D2",
+    "lastKnownWriteTime" : 1510008867,
+    "last_content_update" : 1510008867,
+    "path" : "~/Desktop/Developing-data-products/Week-4-Project/ui.R",
+    "project_path" : "ui.R",
+    "properties" : {
+    },
+    "relative_order" : 2,
+    "source_on_save" : false,
+    "source_window" : "",
+    "type" : "r_source"
+}
